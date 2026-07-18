@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "https_bxtonwjjrnojydrzdlim_supabase_co_functions_v1_flutterwave_webhook": {
+      "enabled": false
+    },
+    "github": {
+      "enabled": true
+    }
+  }
+}
