@@ -4,13 +4,10 @@ import { supabase } from "@/lib/supabase";
 import { AppShell } from "./AppShell";
 
 type FormState = {
-  display_name: string;
-  bio: string;
-  language: string;
-  timezone: string;
+  full_name: string;
 };
 
-const empty: FormState = { display_name: "", bio: "", language: "en", timezone: "" };
+const empty: FormState = { full_name: "" };
 
 export function ProfilePage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -23,10 +20,7 @@ export function ProfilePage() {
   useEffect(() => {
     if (profile) {
       setForm({
-        display_name: profile.display_name ?? "",
-        bio: profile.bio ?? "",
-        language: profile.language ?? "en",
-        timezone: profile.timezone ?? "",
+        full_name: profile.full_name ?? "",
       });
       setDirty(false);
     }
@@ -46,12 +40,9 @@ export function ProfilePage() {
     const { error } = await supabase
       .from("profiles")
       .update({
-        display_name: form.display_name.trim() || null,
-        bio: form.bio.trim() || null,
-        language: form.language,
-        timezone: form.timezone.trim() || null,
+        full_name: form.full_name.trim() || null,
       })
-      .eq("user_id", user.id);
+      .eq("id", user.id);
 
     setSaving(false);
     if (error) {
@@ -69,8 +60,7 @@ export function ProfilePage() {
     <AppShell title="Profile">
       {isSuspended && (
         <div className="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          Your account is {profile?.account_status}.{" "}
-          {profile?.suspended_reason && `Reason: ${profile.suspended_reason}`}
+          Your account is {profile?.account_status}.
         </div>
       )}
 
@@ -78,11 +68,11 @@ export function ProfilePage() {
         <aside className="card p-6 lg:col-span-1">
           <div className="flex flex-col items-center text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-brand-100 text-2xl font-bold text-brand-700">
-              {(form.display_name || user?.email || "?")
+              {(form.full_name || user?.email || "?")
                 .split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
             </div>
             <h2 className="mt-4 text-lg font-semibold text-ink-900">
-              {form.display_name || "Unnamed creator"}
+              {form.full_name || "Unnamed creator"}
             </h2>
             <p className="text-sm text-ink-500">{user?.email}</p>
             <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-ink-100 px-3 py-1 text-xs font-medium text-ink-600">
@@ -116,57 +106,14 @@ export function ProfilePage() {
 
           <form onSubmit={onSubmit} className="mt-6 space-y-5" noValidate>
             <div>
-              <label className="label" htmlFor="display_name">Display name</label>
+              <label className="label" htmlFor="full_name">Display name</label>
               <input
-                id="display_name"
+                id="full_name"
                 className="input"
-                value={form.display_name}
-                onChange={(e) => update("display_name", e.target.value)}
+                value={form.full_name}
+                onChange={(e) => update("full_name", e.target.value)}
                 placeholder="How should we credit you?"
               />
-            </div>
-
-            <div>
-              <label className="label" htmlFor="bio">Bio</label>
-              <textarea
-                id="bio"
-                rows={4}
-                className="input resize-none"
-                value={form.bio}
-                onChange={(e) => update("bio", e.target.value)}
-                placeholder="A short bio for your creator profile."
-              />
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label className="label" htmlFor="language">Language</label>
-                <select
-                  id="language"
-                  className="input"
-                  value={form.language}
-                  onChange={(e) => update("language", e.target.value)}
-                >
-                  <option value="en">English</option>
-                  <option value="fr">Français</option>
-                  <option value="es">Español</option>
-                  <option value="de">Deutsch</option>
-                  <option value="pt">Português</option>
-                  <option value="ar">العربية</option>
-                  <option value="yo">Yorùbá</option>
-                  <option value="sw">Kiswahili</option>
-                </select>
-              </div>
-              <div>
-                <label className="label" htmlFor="timezone">Timezone</label>
-                <input
-                  id="timezone"
-                  className="input"
-                  value={form.timezone}
-                  onChange={(e) => update("timezone", e.target.value)}
-                  placeholder="e.g. Africa/Lagos"
-                />
-              </div>
             </div>
 
             {saveError && (
