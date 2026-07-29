@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
+import { useAdmin } from "@/admin/AdminContext";
 
 export function AppShell({
   children,
@@ -9,6 +10,7 @@ export function AppShell({
   title: string;
 }) {
   const { user, profile, signOut } = useAuth();
+  const { isAdmin } = useAdmin();
   const navigate = useNavigate();
 
   const onSignOut = async () => {
@@ -16,8 +18,8 @@ export function AppShell({
     navigate("/signin", { replace: true });
   };
 
-  const initials = profile?.display_name
-    ? profile.display_name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()
+  const initials = profile?.full_name
+    ? profile.full_name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()
     : (user?.email?.[0] ?? "?").toUpperCase();
 
   return (
@@ -43,7 +45,7 @@ export function AppShell({
             >
               Profile
             </NavLink>
-            {profile?.is_admin && (
+            {isAdmin && (
               <NavLink
                 to="/admin"
                 className={({ isActive }) =>
