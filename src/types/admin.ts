@@ -41,7 +41,7 @@ export type Payment = {
   currency: string;
   status: "succeeded" | "failed" | "pending" | "refunded";
   provider: string | null;
-  provider_tx_ref: string | null;
+  payment_reference: string | null;
   is_flagged: boolean;
   flag_reason: string | null;
   created_at: string;
