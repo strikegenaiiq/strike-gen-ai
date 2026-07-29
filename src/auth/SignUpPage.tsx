@@ -35,21 +35,13 @@ export function SignUpPage() {
     const { data, error } = await supabase.auth.signUp({
       email: emailF.value.trim(),
       password: password.value,
-      options: { data: { display_name: name.value.trim() } },
+      options: { data: { full_name: name.value.trim() } },
     });
 
     if (error) {
       setFormError(friendlyAuthError(error.message));
       setSubmitting(false);
       return;
-    }
-
-    if (data.user) {
-      await supabase.from("profiles").upsert({
-        user_id: data.user.id,
-        display_name: name.value.trim(),
-        language: "en",
-      });
     }
 
     if (data.session) {
