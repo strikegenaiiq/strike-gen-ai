@@ -3,7 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -19,6 +19,13 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (!session) {
     return <Navigate to="/signin" replace state={{ from: location.pathname }} />;
+  }
+
+  const isBlocked =
+    profile?.account_status === "suspended" || profile?.account_status === "banned";
+
+  if (isBlocked && location.pathname !== "/profile") {
+    return <Navigate to="/profile" replace />;
   }
 
   return <>{children}</>;
