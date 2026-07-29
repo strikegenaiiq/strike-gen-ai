@@ -15,44 +15,39 @@ import { AdminAudit } from "@/admin/AdminAudit";
 export function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Navigate to="/app/profile" replace />} />
-          <Route path="/signin" element={<SignInPage />} />
-          <Route path="/signup" element={<SignUpPage />} />
+      <AdminProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Navigate to="/app/profile" replace />} />
+            <Route path="/signin" element={<SignInPage />} />
+            <Route path="/signup" element={<SignUpPage />} />
 
-          {/* User app */}
-          <Route
-            path="/app/*"
-            element={
-              <ProtectedRoute>
-                <Routes>
-                  <Route path="profile" element={<ProfilePage />} />
-                  <Route path="*" element={<Navigate to="/app/profile" replace />} />
-                </Routes>
-              </ProtectedRoute>
-            }
-          />
+            {/* User app */}
+            <Route
+              path="/app/*"
+              element={
+                <ProtectedRoute>
+                  <Routes>
+                    <Route path="profile" element={<ProfilePage />} />
+                    <Route path="*" element={<Navigate to="/app/profile" replace />} />
+                  </Routes>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Admin console */}
-          <Route
-            path="/admin/*"
-            element={
-              <AdminProvider>
-                <AdminLayout />
-              </AdminProvider>
-            }
-          >
-            <Route index element={<AdminOverview />} />
-            <Route path="users" element={<AdminUsers />} />
-            <Route path="payments" element={<AdminPayments />} />
-            <Route path="fraud" element={<AdminFraud />} />
-            <Route path="audit" element={<AdminAudit />} />
-          </Route>
+            {/* Admin console */}
+            <Route path="/admin/*" element={<AdminLayout />}>
+              <Route index element={<AdminOverview />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="payments" element={<AdminPayments />} />
+              <Route path="fraud" element={<AdminFraud />} />
+              <Route path="audit" element={<AdminAudit />} />
+            </Route>
 
-          <Route path="*" element={<Navigate to="/app/profile" replace />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="*" element={<Navigate to="/app/profile" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AdminProvider>
     </AuthProvider>
   );
 }
