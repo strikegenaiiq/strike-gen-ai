@@ -21,7 +21,7 @@ export function AdminPayments() {
       .order("created_at", { ascending: false });
 
     if (filter === "flagged") query = query.eq("is_flagged", true);
-    else if (filter === "succeeded") query = query.eq("status", "succeeded");
+    else if (filter === "succeeded") query = query.eq("status", "successful");
     else if (filter === "refunded") query = query.eq("status", "refunded");
     else if (filter === "pending") query = query.eq("status", "pending");
 
@@ -57,7 +57,7 @@ export function AdminPayments() {
   };
 
   const totalRevenue = payments
-    .filter((p) => p.status === "succeeded" && !p.is_flagged)
+    .filter((p) => p.status === "successful")
     .reduce((sum, p) => sum + Number(p.amount), 0);
   const flaggedCount = payments.filter((p) => p.is_flagged).length;
   const refundedCount = payments.filter((p) => p.status === "refunded").length;
@@ -129,7 +129,7 @@ export function AdminPayments() {
                       {p.provider || "—"}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-ink-500">
-                      {p.provider_tx_ref || "—"}
+                      {p.payment_reference || "—"}
                     </td>
                     <td className="px-4 py-3 text-ink-500">
                       {new Date(p.created_at).toLocaleDateString()}
@@ -164,7 +164,7 @@ export function AdminPayments() {
             <h3 className="text-lg font-semibold text-ink-900">Flag payment</h3>
             <p className="mt-1 text-sm text-ink-500">
               ${Number(flagModal.amount).toFixed(2)} {flagModal.currency} ·{" "}
-              {flagModal.provider_tx_ref}
+              {flagModal.payment_reference}
             </p>
             <div className="mt-4">
               <label className="label">Reason</label>
@@ -207,7 +207,7 @@ function PaymentStatusBadge({ status, flagged }: { status: string; flagged: bool
     );
   }
   const map: Record<string, string> = {
-    succeeded: "bg-emerald-100 text-emerald-700",
+    successful: "bg-emerald-100 text-emerald-700",
     pending: "bg-amber-100 text-amber-700",
     failed: "bg-rose-100 text-rose-700",
     refunded: "bg-ink-100 text-ink-600",
