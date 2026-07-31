@@ -3,9 +3,6 @@
 An enterprise-grade AI creator platform designed to empower content creators with intelligent tools for generating professional videos, images, audio, and creative content from prompts.
 
 ---
-## npx skills add https://github.com/leonxlnx/taste-skill --skill design-taste-frontend
-
-## Vision
 
 To democratize AI-powered content creation by providing creators, agencies, and enterprises with an intuitive, scalable platform that transforms ideas into professional-quality digital assets through simple prompts.
 
@@ -117,19 +114,33 @@ Complete project documentation is maintained in the `docs/` directory:
 
 ## Development Status
 
-🚀 **Current Phase: Product Planning**
+## 🚀 Current Phase: Active Development (MVP)
 
-This repository is in the early planning stage. The project is currently focused on:
+### ✅ Completed
+- React + Vite application foundation
+- Supabase PostgreSQL database schema
+- Authentication and user profile system
+- Row Level Security (RLS) policies
+- Credit ledger architecture
+- Payment integration foundation
+- Project documentation and GitHub workflows
 
-- Defining product requirements and specifications
-- Documenting architecture and technical design
-- Planning database schema and data models
-- Designing API contracts
-- Establishing deployment and infrastructure strategy
+### 🚧 In Progress
+- AI video generation pipeline
+- AI image generation pipeline
+- User dashboard
+- Subscription and billing experience
+- Credit consumption engine
+- AWS S3 media storage integration
+- AWS Amplify deployment
+- Admin dashboard
 
-**Implementation has not yet begun.** No code or production systems have been deployed.
-
----
+### 📅 Planned
+- AI Live Studio
+- Team collaboration
+- Public API
+- Mobile application
+- Enterprise features
 
 ## Contributing
 
