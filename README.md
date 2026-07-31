@@ -3,7 +3,7 @@
 An enterprise-grade AI creator platform designed to empower content creators with intelligent tools for generating professional videos, images, audio, and creative content from prompts.
 
 ---
-npx skills add https://github.com/leonxlnx/taste-skill --skill design-taste-frontend
+## npx skills add https://github.com/leonxlnx/taste-skill --skill design-taste-frontend
 
 ## Vision
 
