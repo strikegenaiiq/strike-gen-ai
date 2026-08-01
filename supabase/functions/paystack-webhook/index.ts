@@ -12,14 +12,14 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json" },
   });
 }
 
-async function logRejection(reason: string, metadata: Record<string, unknown>) {
+async function logRejection(reason, metadata) {
   await supabaseAdmin.from("audit_logs").insert({
     action: "paystack_webhook_rejected",
     target_type: "payment",
@@ -28,9 +28,7 @@ async function logRejection(reason: string, metadata: Record<string, unknown>) {
   });
 }
 
-// Paystack signs the raw request body with HMAC-SHA512 using your secret key.
-// Unlike Flutterwave's static-hash comparison, this one is a real HMAC.
-async function verifySignature(rawBody: string, signature: string): Promise<boolean> {
+async function verifySignature(rawBody, signature) {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(PAYSTACK_SECRET_KEY),
@@ -45,7 +43,7 @@ async function verifySignature(rawBody: string, signature: string): Promise<bool
   return computedHex === signature;
 }
 
-async function verifyWithPaystack(reference: string): Promise<{ ok: boolean; data?: any }> {
+async function verifyWithPaystack(reference) {
   const resp = await fetch(
     `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
     { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } },
@@ -68,7 +66,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Unauthorized signature" }, 401);
   }
 
-  let payload: any;
+  let payload;
   try {
     payload = JSON.parse(rawBody);
   } catch {
@@ -79,8 +77,8 @@ Deno.serve(async (req) => {
     return jsonResponse({ status: "ignored", reason: "unhandled_event" }, 200);
   }
 
-  const reference: string | undefined = payload?.data?.reference;
-  const userId: string | undefined = payload?.data?.metadata?.user_id;
+  const reference = payload?.data?.reference;
+  const userId = payload?.data?.metadata?.user_id;
   const planIdRaw = payload?.data?.metadata?.plan_id;
   const packIdRaw = payload?.data?.metadata?.pack_id;
 
@@ -100,56 +98,44 @@ Deno.serve(async (req) => {
     return jsonResponse({ status: "ignored", reason: "not_verified" }, 200);
   }
 
-  const paymentType: "subscription" | "token_purchase" = planIdRaw ? "subscription" : "token_purchase";
+  const paymentType = planIdRaw ? "subscription" : "token_purchase";
   const planId = planIdRaw ? Number(planIdRaw) : null;
   const packId = packIdRaw ? Number(packIdRaw) : null;
 
   const verifiedAmount = Number(verified.data?.amount ?? 0) / 100;
-  const verifiedCurrency: string = verified.data?.currency ?? "NGN";
+  const verifiedCurrency = verified.data?.currency ?? "NGN";
 
-  let expectedPrice: number | null = null;
-  if (paymentType === "subscription") {
-    const { data: plan } = await supabaseAdmin
-      .from("subscription_plans")
-      .select("monthly_price_usd, is_active")
-      .eq("id", planId)
-      .maybeSingle();
-    if (!plan || !plan.is_active) {
-      await logRejection("Unknown or inactive plan_id", { reference, userId, planId });
-      return jsonResponse({ error: "Unknown plan" }, 400);
-    }
-    expectedPrice = Number(plan.monthly_price_usd);
-  } else {
-    const { data: pack } = await supabaseAdmin
-      .from("token_packs")
-      .select("price_usd, is_active")
-      .eq("id", packId)
-      .maybeSingle();
-    if (!pack || !pack.is_active) {
-      await logRejection("Unknown or inactive pack_id", { reference, userId, packId });
-      return jsonResponse({ error: "Unknown pack" }, 400);
-    }
-    expectedPrice = Number(pack.price_usd);
+  const { data: intent, error: intentError } = await supabaseAdmin
+    .from("payment_intents")
+    .select("expected_amount, expected_currency, status")
+    .eq("tx_ref", reference)
+    .maybeSingle();
+
+  if (intentError || !intent) {
+    await logRejection("No matching payment_intent found", { reference, userId, error: intentError?.message });
+    return jsonResponse({ error: "No matching payment intent" }, 400);
   }
 
-  if (verifiedCurrency === "USD" && expectedPrice !== null) {
-    const tolerance = 0.01;
-    if (Math.abs(verifiedAmount - expectedPrice) > tolerance) {
-      await logRejection("Amount mismatch", {
-        reference, userId, expectedPrice, verifiedAmount, verifiedCurrency,
-      });
-      return jsonResponse({ error: "Amount mismatch" }, 400);
-    }
-  } else {
-    await supabaseAdmin.from("audit_logs").insert({
-      action: "paystack_webhook_currency_mismatch",
-      target_type: "payment",
-      description: "Verified amount currency differs from stored USD price; skipped strict amount check",
-      metadata: { reference, userId, expectedPrice, verifiedAmount, verifiedCurrency },
+  if (intent.status === "fulfilled") {
+    return jsonResponse({ status: "already_processed" });
+  }
+
+  if (intent.expected_currency !== verifiedCurrency) {
+    await logRejection("Currency mismatch vs locked intent", {
+      reference, userId, expected: intent.expected_currency, actual: verifiedCurrency,
     });
+    return jsonResponse({ error: "Currency mismatch" }, 400);
   }
 
-  const { data: result, error: rpcError } = await supabaseAdmin.rpc("fulfill_flutterwave_payment", {
+  const tolerance = 0.01;
+  if (verifiedAmount + tolerance < Number(intent.expected_amount)) {
+    await logRejection("Underpayment vs locked intent", {
+      reference, userId, expected: intent.expected_amount, verifiedAmount, verifiedCurrency,
+    });
+    return jsonResponse({ error: "Amount does not meet expected charge" }, 400);
+  }
+
+  const { data: result, error: rpcError } = await supabaseAdmin.rpc("fulfill_payment", {
     p_user_id: userId,
     p_tx_ref: reference,
     p_payment_type: paymentType,
