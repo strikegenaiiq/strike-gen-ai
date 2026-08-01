@@ -188,6 +188,28 @@ Monitoring (Future)
 
 ---
 
+## Environment Variables
+
+Create a `.env.local` file (or `.env` for Vite) in the project root and configure the following variables:
+
+```env
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+
+PAYSTACK_SECRET_KEY=
+
+OPENAI_API_KEY=
+REPLICATE_API_TOKEN=
+GOOGLE_API_KEY=
+
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=
+S3_BUCKET_NAME=
+```
+
+> **Important:** Never commit real API keys or secrets to GitHub.
+
 ## Tech Stack
 
 Layer              Technology
