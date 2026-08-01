@@ -94,7 +94,107 @@ strike-gen-ai/
 └── LICENSE                      # MIT License
 ```
 
+## 🏗️ System Architecture
+
+```text
+Frontend
+├── React + Vite
+├── Tailwind CSS
+└── AWS Amplify (Hosting)
+
+Backend
+├── Supabase Auth
+├── PostgreSQL
+├── Realtime
+├── Edge Functions
+└── Row Level Security (RLS)
+
+Media Storage
+├── Amazon S3
+└── Amazon CloudFront
+
+AI Providers
+├── Google Veo
+├── Runway
+├── Replicate
+├── OpenAI
+└── ElevenLabs
+
+Payments
+└── Paystack
+
+```
+
+## Technology Stack
+
+```
+
+Frontend
+├── React + Vite
+├── Tailwind CSS
+└── AWS Amplify
+
+Backend
+├── Supabase Auth
+├── PostgreSQL
+├── Realtime
+├── Edge Functions
+└── Row Level Security (RLS)
+
+Media & CDN
+├── Amazon S3
+└── Amazon CloudFront
+
+AI Providers
+├── Google Veo
+├── Runway
+├── Replicate
+├── OpenAI
+└── ElevenLabs
+
+Payments
+└── Paystack
+
+Monitoring (Future)
+├── AWS CloudWatch
+└── Sentry
+
 ---
+
+## Tech Stack
+
+Layer              Technology
+
+Frontend           React + Vite
+
+Styling            Tailwind CSS
+
+Hosting            AWS Amplify
+
+Backend            Supabase
+
+Database           PostgreSQL
+
+Authentication     Supabase Auth
+
+Storage            Amazon S3
+
+CDN                Amazon CloudFront
+
+AI Models           Google Veo, 
+            
+                    Runway, 
+
+                    Replicate,
+
+                    OpenAI, 
+
+                    ElevenLabs
+          
+Payments.           Paystack
+
+
+````
 
 ## Documentation
 
