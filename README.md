@@ -90,7 +90,34 @@ strike-gen-ai/
 │   ├── branding.md              # Brand guidelines and identity
 │   ├── contributing.md          # Contribution guidelines and standards
 │   └── changelog.md             # Version history and release notes
-├── README.md                    # This file
+├──
+# This file
+|
+README.md                 # Main project overview
+LICENSE
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+CODE_OF_CONDUCT.md
+
+AGENTS.md                 # Instructions for AI coding agents
+CLAUDE.md                 # Claude-specific guidance (optional)
+GEMINI.md                 # Gemini-specific guidance (optional)
+COPILOT.md                # GitHub Copilot guidance (optional)
+
+docs/
+├── architecture.md
+├── database-design.md
+├── api-specification.md
+├── deployment-strategy.md
+├── security-architecture.md
+├── ui-ux-design-system.md
+├── feature-specifications.md
+├── testing-strategy.md
+├── business-model.md
+├── user-flows.md
+├── roadmap.md
+└── contributing-guide.md
 └── LICENSE                      # MIT License
 ```
 
