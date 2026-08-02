@@ -19,10 +19,16 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": FRONTEND_BASE_URL,
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
   });
 }
 
@@ -35,7 +41,8 @@ async function getLiveFxRate(from, to) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
 
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace("Bearer ", "");
@@ -47,7 +54,9 @@ Deno.serve(async (req) => {
   });
 
   const { data: userData, error: userError } = await supabaseAsUser.auth.getUser(token);
-  if (userError || !userData?.user) return jsonResponse({ error: "Not authenticated" }, 401);
+  if (userError || !userData?.user) {
+    return jsonResponse({ error: "Not authenticated" }, 401);
+  }
   const userId = userData.user.id;
   const userEmail = userData.user.email;
   if (!userEmail) return jsonResponse({ error: "User has no email on file" }, 400);
@@ -63,7 +72,9 @@ Deno.serve(async (req) => {
   if (provider !== "paystack" && provider !== "flutterwave") {
     return jsonResponse({ error: "provider must be 'paystack' or 'flutterwave'" }, 400);
   }
-  if (!planId && !packId) return jsonResponse({ error: "planId or packId is required" }, 400);
+  if (!planId && !packId) {
+    return jsonResponse({ error: "planId or packId is required" }, 400);
+  }
 
   try {
     const paymentType = planId ? "subscription" : "token_purchase";
@@ -75,7 +86,9 @@ Deno.serve(async (req) => {
         .select("monthly_price_usd, is_active")
         .eq("id", planId)
         .single();
-      if (error || !plan || !plan.is_active) return jsonResponse({ error: "Plan not found or inactive" }, 404);
+      if (error || !plan || !plan.is_active) {
+        return jsonResponse({ error: "Plan not found or inactive" }, 404);
+      }
       usdPrice = plan.monthly_price_usd;
     } else {
       const { data: pack, error } = await supabaseAdmin
@@ -83,13 +96,16 @@ Deno.serve(async (req) => {
         .select("price_usd, is_active")
         .eq("id", packId)
         .single();
-      if (error || !pack || !pack.is_active) return jsonResponse({ error: "Token pack not found or inactive" }, 404);
+      if (error || !pack || !pack.is_active) {
+        return jsonResponse({ error: "Token pack not found or inactive" }, 404);
+      }
       usdPrice = pack.price_usd;
     }
 
     const targetCurrency = "NGN";
     const fx = await getLiveFxRate("USD", targetCurrency);
     const expectedAmount = Math.ceil(usdPrice * fx.rate * 100) / 100;
+
     const txRef = `sga_${crypto.randomUUID()}`;
 
     const { error: intentError } = await supabaseAdmin.from("payment_intents").insert({
@@ -118,7 +134,10 @@ Deno.serve(async (req) => {
     if (provider === "paystack") {
       const resp = await fetch("https://api.paystack.co/transaction/initialize", {
         method: "POST",
-        headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           email: userEmail,
           amount: Math.round(expectedAmount * 100),
@@ -129,11 +148,15 @@ Deno.serve(async (req) => {
       });
       const data = await resp.json();
       if (!resp.ok || !data.status) throw new Error(`Paystack initialize failed: ${JSON.stringify(data)}`);
+
       return jsonResponse({ checkoutUrl: data.data.authorization_url, txRef, expectedAmount, currency: targetCurrency });
     } else {
       const resp = await fetch("https://api.flutterwave.com/v3/payments", {
         method: "POST",
-        headers: { Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           tx_ref: txRef,
           amount: expectedAmount,
@@ -145,6 +168,7 @@ Deno.serve(async (req) => {
       });
       const data = await resp.json();
       if (!resp.ok || data.status !== "success") throw new Error(`Flutterwave initialize failed: ${JSON.stringify(data)}`);
+
       return jsonResponse({ checkoutUrl: data.data.link, txRef, expectedAmount, currency: targetCurrency });
     }
   } catch (err) {
