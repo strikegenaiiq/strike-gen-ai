@@ -39,7 +39,7 @@ export type Payment = {
   user_id: string;
   amount: number;
   currency: string;
-  status: "succeeded" | "failed" | "pending" | "refunded";
+  status: "successful" | "failed" | "pending" | "refunded";
   provider: string | null;
   payment_reference: string | null;
   is_flagged: boolean;
