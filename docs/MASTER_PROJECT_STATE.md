@@ -23,7 +23,7 @@ Auth, Profiles, Subscriptions, Token Economy, Flutterwave, Paystack, AI Generati
 | `subscription_plans` | 4 plans: Standard ($19/300 tokens), Pro ($49/1000), Premium ($99/2500), Creator Ultra ($249/7000) | Public read |
 | `subscriptions` | `user_id`, `plan_id`, `status`, `current_period_start/end`. One active subscription per user (unique partial index) | Per-user + admin override |
 | `payments` | `payment_reference` (unique), `status` (pending/processing/**successful**/failed/cancelled/refunded — not "succeeded") | Per-user + admin override |
-| `token_ledgers` | Append-only. `transaction_type`, `entry_type`, `reference`, `amount`. Idempotency via unique index on `(reference, transaction_type)` for monthly_allocation/purchase | Per-user + admin override |
+| `token_ledgers` | Append-only. `transaction_type`, `entry_type`, `reference`, `amount`. Idempotency via unique index on `(reference, transaction_type)` for monthly_allocation/purchase | Per-user[...] |
 | `token_packs` | 4 packs: Starter ($5/100), Growth ($20/500), Creator ($45/1200), Studio ($99/3000) | Public read |
 | `ai_models` | 15 rows across Kling/Runway/Replicate. Pricing in `pricing_params` JSONB (see §5) | RLS enabled, no policy (locked) |
 | `providers` | 1 row: Replicate (active) | RLS enabled, no policy (locked) |
@@ -46,19 +46,19 @@ Auth, Profiles, Subscriptions, Token Economy, Flutterwave, Paystack, AI Generati
 - `generation_jobs` = request, queue, orchestration, provider communication, progress, status
 - `generated_assets` = final file, storage URL, thumbnail, metadata, provider cost, tokens consumed, generation status
 
-**Relationship (schema change pending, not yet applied):** `generated_assets.generation_job_id uuid NOT NULL REFERENCES generation_jobs(id) ON DELETE RESTRICT` — every asset belongs to exactly one job; a job may produce multiple assets (batch image generation). Also pending: `generated_assets.thumbnail_url text`.
+**Relationship (schema change pending, not yet applied):** `generated_assets.generation_job_id uuid NOT NULL REFERENCES generation_jobs(id) ON DELETE RESTRICT` — every asset belongs to exactly o[...]
 
 ---
 
 ## 4. Cost Engine (Locked Design, Not Yet Implemented)
 
-`calculate_generation_cost()` is currently **broken** — references nonexistent columns (`model_identifier`, `raw_cost_usd`, `markup_multiplier`, `minimum_token_charge`). Redesign must read the real `ai_models` schema:
+`calculate_generation_cost()` is currently **broken** — references nonexistent columns (`model_identifier`, `raw_cost_usd`, `markup_multiplier`, `minimum_token_charge`). Redesign must read the r[...]
 
 - `pricing_params->>'kind'` is `'video'`, `'image'`, or `'audio'`
 - **video:** `costPerSecond` keyed by resolution
 - **image:** `costPerImage` keyed by resolution, capped by `maxImagesPerRequest`
 - **audio:** either `costPerCharacter` (TTS models) or `costPerSecond` (music models) — no single formula
-- No markup/minimum-charge column exists anywhere — these are platform-wide constants inside the function, not per-model. Proposed defaults (unconfirmed): 2.2x markup, 1 token minimum, $0.035/token baseline.
+- No markup/minimum-charge column exists anywhere — these are platform-wide constants inside the function, not per-model. Proposed defaults (unconfirmed): 2.2x markup, 1 token minimum, $0.035/to[...]
 
 Not implemented yet — deferred until repository stabilization is complete, per lock decision.
 
@@ -66,43 +66,41 @@ Not implemented yet — deferred until repository stabilization is complete, per
 
 ## 5. Authentication Flow
 
-Signup: `supabase.auth.signUp({ email, password, options: { data: { full_name } } })` → `on_auth_user_created` trigger (function `handle_new_user_signup_grant()`) creates `profiles` row + grants 60-token welcome bonus into `token_ledgers`.
+Signup: `supabase.auth.signUp({ email, password, options: { data: { full_name } } })` → `on_auth_user_created` trigger (function `handle_new_user_signup_grant()`) creates `profiles` row + grants[...]
 
 **Known dead code:** `handle_new_user()` — a second, correctly-written profile-creation function exists but has no trigger attached. Not wired up, not deleted. Not touched pending your decision.
 
 Profile loading: `AuthContext.tsx` queries `profiles.id = auth.uid()` (fixed from a broken `user_id` column reference).
 
-**Account status gating:** `ProtectedRoute.tsx` blocks `suspended`/`banned` users from all routes except `/profile` (which shows the status banner). Client-side only — no RLS-layer enforcement on writes yet (flagged gap).
+**Account status gating:** `ProtectedRoute.tsx` blocks `suspended`/`banned` users from all routes except `/profile` (which shows the status banner). Client-side only — no RLS-layer enforcement o[...]
 
 ---
 
 ## 6. Payment Flow
 
-**Flutterwave** (`supabase/functions/flutterwave-webhook/`): signature = plain equality against `FLUTTERWAVE_WEBHOOK_SECRET` (not HMAC — Flutterwave's `verif-hash` is a static shared secret). Re-verifies via `verify_by_reference` API before fulfilling.
+Flutterwave (supabase/functions/flutterwave-webhook/): signature = plain equality against FLUTTERWAVE_WEBHOOK_SECRET. Re-verifies via verify_by_reference API before fulfilling.
 
-**Paystack** (`supabase/functions/paystack-webhook/`): signature = real HMAC-SHA512 over raw body. Amounts arrive in kobo/cents, divided by 100. Re-verifies via `/transaction/verify/:reference`.
+Paystack (supabase/functions/paystack-webhook/): signature = real HMAC-SHA512 over raw body. Amounts arrive in kobo/cents, divided by 100. Re-verifies via /transaction/verify/:reference.
 
-**Both call the same RPC:** `fulfill_flutterwave_payment(p_user_id, p_tx_ref, p_payment_type, p_plan_id, p_pack_id, p_amount_paid, p_currency, p_provider)` — credit amount always derived server-side from `subscription_plans.monthly_tokens` or `token_packs.credits`, never trusted from the caller. Idempotent via `payments.payment_reference` uniqueness check. Atomic (payment + subscription + ledger + audit log in one transaction).
+Currency-safe checkout flow: payment_intents table locks the expected charge amount, currency, and FX rate at checkout initiation, before the provider is called. Both webhooks look up the matching payment_intents row by tx_ref and compare the provider-verified amount against the locked expected_amount in the same currency. Underpayment or currency mismatch blocks fulfillment. Stale pending intents are swept to expired every 5 minutes via pg_cron.
 
-**Known naming debt:** the RPC is still named `fulfill_flutterwave_payment` despite serving both providers. Cosmetic only, not renamed yet.
+Both webhooks now call fulfill_payment (renamed from fulfill_flutterwave_payment, now provider-neutral). Credit amount always derived server-side, never trusted from the caller. Idempotent via payments.payment_reference uniqueness plus payment_intents.status check. Atomic.
 
-**Permissions (critical fix applied):** `fulfill_flutterwave_payment` EXECUTE is granted **only to `service_role`** — not `anon`/`authenticated`. This was a real vulnerability (any signed-in user could previously call it directly with a fabricated reference to grant themselves credits) found via a live security advisor check and fixed same-session.
+Permissions: fulfill_payment and expire_stale_payment_intents EXECUTE granted only to service_role.
 
-**Known gap:** `subscription_plans`/`token_packs` only store USD prices; Flutterwave/Paystack often charge NGN. Cross-currency payments skip strict amount verification and are logged for manual review, not blocked.
-
-**Callback URL:** currently a placeholder (`https://bxtonwjjrnojydrzdlim.supabase.co`) — no real domain or checkout UI exists yet. Must be updated once Amplify is live and a real success page exists.
+Checkout initiation: implemented as the checkout-initiate Edge Function (supabase/functions/checkout-initiate/) — fetches a live USD to NGN rate, writes the locked payment_intents row, then calls Paystack or Flutterwave.
 
 ---
 
 ## 7. Admin System
 
-`is_admin()` / `is_admin_with_role(roles[])` — check `admin_users.profile_id = auth.uid() AND is_active`. `admin_users.role` values: `super_admin`, `admin`, `finance`, `support`, `moderator`, `content_manager`.
+`is_admin()` / `is_admin_with_role(roles[])` — check `admin_users.profile_id = auth.uid() AND is_active`. `admin_users.role` values: `super_admin`, `admin`, `finance`, `support`, `moderator`, `c[...]
 
-**RPCs:** `admin_adjust_credits` (super_admin/admin/finance), `admin_set_account_status` (super_admin/admin/moderator/support), `admin_promote_user` (super_admin only). All append-only to `token_ledgers`, all logged to `audit_logs`.
+**RPCs:** `admin_adjust_credits` (super_admin/admin/finance), `admin_set_account_status` (super_admin/admin/moderator/support), `admin_promote_user` (super_admin only). All append-only to `token_[...]
 
-**Frontend:** `AdminContext.tsx` provides `isAdmin`/`role`/`permissions`. `AppShell.tsx` conditionally shows the Admin nav link via `useAdmin()`. `AdminProvider` wraps the entire app (not just `/admin/*`) — required because `AppShell` is used under `/app/*` too.
+**Frontend:** `AdminContext.tsx` provides `isAdmin`/`role`/`permissions`. `AppShell.tsx` conditionally shows the Admin nav link via `useAdmin()`. `AdminProvider` wraps the entire app (not just `/[...]
 
-**Deferred, not built:** payment flagging (`is_flagged`, `admin_flag_payment`), fraud/moderation (`AdminFraud.tsx`, `flagged_events`), analytics (`AdminOverview.tsx`, `revenue_snapshots`, `v_user_growth`) — all reference nonexistent schema, explicitly out of scope until designed separately.
+**Deferred, not built:** payment flagging (`is_flagged`, `admin_flag_payment`), fraud/moderation (`AdminFraud.tsx`, `flagged_events`), analytics (`AdminOverview.tsx`, `revenue_snapshots`, `v_user[...]
 
 ---
 
@@ -110,9 +108,9 @@ Profile loading: `AuthContext.tsx` queries `profiles.id = auth.uid()` (fixed fro
 
 **Archive** (zero code references, safe to leave inert): `blog_posts`, `blog_users`, `blog_comments`, `colors`, `categories`, `featured_banners`.
 
-**Future Roadmap** (not V1, but real intended features): `discovery_feed` (planned public showcase/community browsing), `generation_jobs`/`notifications`/`support_tickets`/`app_settings` RLS policies, payment flagging, fraud/moderation, analytics snapshots.
+**Future Roadmap** (not V1, but real intended features): `discovery_feed` (planned public showcase/community browsing), `generation_jobs`/`notifications`/`support_tickets`/`app_settings` RLS poli[...]
 
-**Deprecated migrations:** `0011`/`0012`/`0013` reference an abandoned schema (`credits`, `credit_transactions`, `profiles.is_admin`) that was never applied to production. Left in place for history, not re-runnable.
+**Deprecated migrations:** `0011`/`0012`/`0013` reference an abandoned schema (`credits`, `credit_transactions`, `profiles.is_admin`) that was never applied to production. Left in place for histo[...]
 
 ---
 
@@ -130,6 +128,6 @@ Profile loading: `AuthContext.tsx` queries `profiles.id = auth.uid()` (fixed fro
 
 ## 10. Migration History (Reference)
 
-`0011`–`0013` deprecated/unused. `0014` fulfillment RPC + idempotency. `0015` dropped legacy client-trusting overload. `0016`–`0018` admin auth model, dashboard completion, unique constraint. `0019` fixed signup trigger (was blocking all signups). `0020`–`0021` locked down RPC permissions (critical fix). `0022` fixed `get_user_balance()`.
+`0011`–`0013` deprecated/unused. `0014` fulfillment RPC + idempotency. `0015` dropped legacy client-trusting overload. `0016`–`0018` admin auth model, dashboard completion, unique constraint.[...]
 
-Also live but **not in any migration file** (pre-date this reconciliation, applied directly): `security_lock_profile_system_columns`, `perf_add_missing_fkey_indexes`, `perf_fix_rls_auth_uid_initplan`, `security_fix_set_updated_at_search_path`, `security_fix_blog_and_colors_rls_policies`, `security_fix_definer_function_exposure` — all dated 2026-07-19.
+Also live but **not in any migration file** (pre-date this reconciliation, applied directly): `security_lock_profile_system_columns`, `perf_add_missing_fkey_indexes`, `perf_fix_rls_auth_uid_initp[...]
