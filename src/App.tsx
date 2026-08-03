@@ -5,6 +5,7 @@ import { SignInPage } from "@/auth/SignInPage";
 import { SignUpPage } from "@/auth/SignUpPage";
 import { ProtectedRoute } from "@/app/ProtectedRoute";
 import { ProfilePage } from "@/app/ProfilePage";
+import { GeneratePage } from "@/app/GeneratePage";
 import { AdminLayout } from "@/admin/AdminLayout";
 import { AdminOverview } from "@/admin/AdminOverview";
 import { AdminUsers } from "@/admin/AdminUsers";
@@ -28,6 +29,7 @@ export function App() {
               element={
                 <ProtectedRoute>
                   <Routes>
+                    <Route path="generate" element={<GeneratePage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="*" element={<Navigate to="/app/profile" replace />} />
                   </Routes>
