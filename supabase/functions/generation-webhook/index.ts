@@ -54,13 +54,14 @@ async function verifyReplicateWebhook(rawBody: string, webhookId: string, timest
     .map((value) => value.slice(3));
 
   const data = new TextEncoder().encode(signedContent);
-  return signatures.some((signature) => {
+  for (const signature of signatures) {
     try {
-      return crypto.subtle.verify("HMAC", key, base64ToBytes(signature), data);
+      if (await crypto.subtle.verify("HMAC", key, base64ToBytes(signature), data)) return true;
     } catch {
-      return false;
+      // Ignore malformed signatures and continue checking the remaining values.
     }
-  });
+  }
+  return false;
 }
 
 async function persistReplicateOutput(outputUrl: string, userId: string, jobId: string) {
