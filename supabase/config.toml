@@ -1,0 +1,16 @@
+project_id = "bxtonwjjrnojydrzdlim"
+
+[functions.generate-video]
+verify_jwt = true
+
+[functions.checkout-initiate]
+verify_jwt = true
+
+[functions.generation-webhook]
+verify_jwt = false
+
+[functions.paystack-webhook]
+verify_jwt = false
+
+[functions.flutterwave-webhook]
+verify_jwt = false
