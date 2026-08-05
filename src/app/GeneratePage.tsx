@@ -27,6 +27,8 @@ type GenerationJob = {
 type GeneratedAsset = {
   id: string;
   storage_url: string | null;
+  storage_path: string | null;
+  playback_url: string | null;
   generation_status: string;
   error_message: string | null;
   created_at: string;
@@ -83,13 +85,27 @@ export function GeneratePage() {
         .limit(10),
       supabase
         .from("generated_assets")
-        .select("id, storage_url, generation_status, error_message, created_at")
+        .select("id, storage_url, storage_path, generation_status, error_message, created_at")
         .order("created_at", { ascending: false })
         .limit(10),
     ]);
 
     if (jobData) setJobs(jobData as GenerationJob[]);
-    if (assetData) setAssets(assetData as GeneratedAsset[]);
+    if (assetData) {
+      const typedAssets = assetData as Omit<GeneratedAsset, "playback_url">[];
+      const assetsWithPlayback = await Promise.all(
+        typedAssets.map(async (asset) => {
+          if (!asset.storage_path) return { ...asset, playback_url: asset.storage_url };
+
+          const { data } = await supabase.storage
+            .from("generated-videos")
+            .createSignedUrl(asset.storage_path, 3600);
+
+          return { ...asset, playback_url: data?.signedUrl ?? null };
+        }),
+      );
+      setAssets(assetsWithPlayback);
+    }
   };
 
   useEffect(() => {
@@ -231,8 +247,8 @@ export function GeneratePage() {
           <div className="grid grid-cols-2 gap-3">
             {assets.map((asset) => (
               <div key={asset.id} className="rounded-md border p-2">
-                {asset.generation_status === "completed" && asset.storage_url ? (
-                  <video src={asset.storage_url} controls className="w-full rounded" />
+                {asset.generation_status === "completed" && asset.playback_url ? (
+                  <video src={asset.playback_url} controls className="w-full rounded" />
                 ) : asset.generation_status === "failed" ? (
                   <p className="text-sm text-red-600">{asset.error_message ?? "Failed"}</p>
                 ) : (
