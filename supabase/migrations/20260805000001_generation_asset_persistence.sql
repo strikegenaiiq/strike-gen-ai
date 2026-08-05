@@ -17,3 +17,12 @@ create index if not exists generated_assets_user_id_created_at_idx
 
 create index if not exists generation_jobs_user_id_created_at_idx
   on public.generation_jobs(user_id, created_at desc);
+
+create policy "generated_videos_select_own_path"
+  on storage.objects
+  for select
+  to authenticated
+  using (
+    bucket_id = 'generated-videos'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
