@@ -6,8 +6,7 @@ alter table public.generated_assets
   add column if not exists storage_path text;
 
 create unique index if not exists generated_assets_generation_job_id_unique
-  on public.generated_assets(generation_job_id)
-  where generation_job_id is not null;
+  on public.generated_assets(generation_job_id);
 
 create unique index if not exists token_ledgers_generation_reference_unique
   on public.token_ledgers(reference, transaction_type)
