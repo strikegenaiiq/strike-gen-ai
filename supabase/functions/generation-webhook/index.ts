@@ -94,72 +94,41 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Invalid JSON" }, 400);
   }
 
-  const { data: job, error: jobError } = await supabaseAdmin
-    .from("generation_jobs")
-    .select("id, user_id, project_id, provider, model, request, status")
-    .eq("id", jobId)
-    .single();
-
-  if (jobError || !job) return jsonResponse({ error: "Job not found" }, 404);
-
-  if (job.status === "completed" || job.status === "failed") {
-    return jsonResponse({ status: "already_processed" });
-  }
-
   if (payload.status === "succeeded") {
     const outputUrl = Array.isArray(payload.output) ? payload.output[0] : payload.output;
-    const tokensToCharge = job.request?.tokens_to_charge ?? 0;
-
-    await supabaseAdmin
-      .from("generation_jobs")
-      .update({ status: "completed", progress: 100 })
-      .eq("id", jobId);
-
-    const { error: assetError } = await supabaseAdmin.from("generated_assets").insert({
-      user_id: job.user_id,
-      project_id: job.project_id,
-      asset_type: "video",
-      provider: job.provider,
-      storage_url: outputUrl,
-      generation_status: "completed",
-      tokens_consumed: tokensToCharge,
-      meta_parameters: job.request,
-    });
-    if (assetError) console.error("Failed to insert generated_asset:", assetError.message);
-
-    if (tokensToCharge > 0) {
-      const { error: ledgerError } = await supabaseAdmin.from("token_ledgers").insert({
-        user_id: job.user_id,
-        amount: -tokensToCharge,
-        transaction_type: "video_generation",
-        entry_type: "consumption",
-        reference: jobId,
-        description: `Video generation: ${job.model}`,
-      });
-      if (ledgerError) console.error("Failed to deduct token_ledgers:", ledgerError.message);
+    if (!outputUrl || typeof outputUrl !== "string") {
+      return jsonResponse({ error: "Missing generation output" }, 400);
     }
 
-    return jsonResponse({ status: "ok" });
+    const { data, error } = await supabaseAdmin.rpc("finalize_generation_job", {
+      p_job_id: jobId,
+      p_status: "completed",
+      p_output_url: outputUrl,
+      p_error_message: null,
+    });
+
+    if (error) {
+      console.error("Failed to finalize generation job:", error.message);
+      return jsonResponse({ error: "Failed to finalize generation" }, 500);
+    }
+
+    return jsonResponse(data);
   }
 
   if (payload.status === "failed" || payload.status === "canceled") {
-    await supabaseAdmin
-      .from("generation_jobs")
-      .update({ status: "failed", progress: 0 })
-      .eq("id", jobId);
-
-    await supabaseAdmin.from("generated_assets").insert({
-      user_id: job.user_id,
-      project_id: job.project_id,
-      asset_type: "video",
-      provider: job.provider,
-      generation_status: "failed",
-      tokens_consumed: 0,
-      meta_parameters: job.request,
-      error_message: payload.error ?? "Generation failed",
+    const { data, error } = await supabaseAdmin.rpc("finalize_generation_job", {
+      p_job_id: jobId,
+      p_status: "failed",
+      p_output_url: null,
+      p_error_message: typeof payload.error === "string" ? payload.error : "Generation failed",
     });
 
-    return jsonResponse({ status: "ok" });
+    if (error) {
+      console.error("Failed to finalize failed generation job:", error.message);
+      return jsonResponse({ error: "Failed to finalize generation" }, 500);
+    }
+
+    return jsonResponse(data);
   }
 
   return jsonResponse({ status: "ignored" });
