@@ -12,6 +12,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
+const STORAGE_BUCKET = "generated-videos";
 const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
 
 function jsonResponse(body: unknown, status = 200) {
@@ -75,6 +76,39 @@ async function verifyReplicateWebhook(body: string, req: Request) {
   });
 }
 
+async function persistVideo(jobId: string, outputUrl: string) {
+  const response = await fetch(outputUrl);
+  if (!response.ok || !response.body) {
+    throw new Error(`Failed to download generated video (${response.status})`);
+  }
+
+  const contentType = response.headers.get("content-type")?.split(";", 1)[0] ?? "video/mp4";
+  if (contentType !== "video/mp4") {
+    throw new Error(`Unsupported generated video content type: ${contentType}`);
+  }
+
+  const contentLength = response.headers.get("content-length");
+  if (contentLength && Number(contentLength) > 50 * 1024 * 1024) {
+    throw new Error("Generated video exceeds the 50 MB storage limit");
+  }
+
+  const storagePath = `generations/${jobId}.mp4`;
+  const { error } = await supabaseAdmin.storage.from(STORAGE_BUCKET).upload(storagePath, response.body, {
+    contentType: "video/mp4",
+    cacheControl: "31536000",
+    upsert: false,
+  });
+
+  if (error) {
+    if (error.message.toLowerCase().includes("already exists")) {
+      return storagePath;
+    }
+    throw error;
+  }
+
+  return storagePath;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
@@ -100,19 +134,23 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing generation output" }, 400);
     }
 
-    const { data, error } = await supabaseAdmin.rpc("finalize_generation_job", {
-      p_job_id: jobId,
-      p_status: "completed",
-      p_output_url: outputUrl,
-      p_error_message: null,
-    });
+    try {
+      const storagePath = await persistVideo(jobId, outputUrl);
+      const { data, error } = await supabaseAdmin.rpc("finalize_generation_job", {
+        p_job_id: jobId,
+        p_status: "completed",
+        p_output_url: null,
+        p_error_message: null,
+        p_storage_bucket: STORAGE_BUCKET,
+        p_storage_path: storagePath,
+      });
 
-    if (error) {
-      console.error("Failed to finalize generation job:", error.message);
-      return jsonResponse({ error: "Failed to finalize generation" }, 500);
+      if (error) throw error;
+      return jsonResponse(data);
+    } catch (error) {
+      console.error("Failed to persist/finalize generated video:", error);
+      return jsonResponse({ error: "Failed to persist generated video" }, 500);
     }
-
-    return jsonResponse(data);
   }
 
   if (payload.status === "failed" || payload.status === "canceled") {
@@ -121,6 +159,8 @@ Deno.serve(async (req) => {
       p_status: "failed",
       p_output_url: null,
       p_error_message: typeof payload.error === "string" ? payload.error : "Generation failed",
+      p_storage_bucket: null,
+      p_storage_path: null,
     });
 
     if (error) {
