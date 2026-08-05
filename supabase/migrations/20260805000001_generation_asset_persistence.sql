@@ -9,6 +9,10 @@ create unique index if not exists generated_assets_generation_job_id_unique
   on public.generated_assets(generation_job_id)
   where generation_job_id is not null;
 
+create unique index if not exists token_ledgers_generation_reference_unique
+  on public.token_ledgers(reference, transaction_type)
+  where transaction_type = 'video_generation';
+
 create index if not exists generated_assets_user_id_created_at_idx
   on public.generated_assets(user_id, created_at desc);
 
