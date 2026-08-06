@@ -6,6 +6,7 @@ import { SignUpPage } from "@/auth/SignUpPage";
 import { ProtectedRoute } from "@/app/ProtectedRoute";
 import { ProfilePage } from "@/app/ProfilePage";
 import { GeneratePage } from "@/app/GeneratePage";
+import { PricingPage } from "@/app/PricingPage";
 import { AdminLayout } from "@/admin/AdminLayout";
 import { AdminOverview } from "@/admin/AdminOverview";
 import { AdminUsers } from "@/admin/AdminUsers";
@@ -23,21 +24,20 @@ export function App() {
             <Route path="/signin" element={<SignInPage />} />
             <Route path="/signup" element={<SignUpPage />} />
 
-            {/* User app */}
             <Route
               path="/app/*"
               element={
                 <ProtectedRoute>
                   <Routes>
                     <Route path="generate" element={<GeneratePage />} />
+                    <Route path="pricing" element={<PricingPage />} />
                     <Route path="profile" element={<ProfilePage />} />
-                    <Route path="*" element={<Navigate to="/app/profile" replace />} />
+                    <Route path="*" element={<Navigate to="/app/generate" replace />} />
                   </Routes>
                 </ProtectedRoute>
               }
             />
 
-            {/* Admin console */}
             <Route path="/admin/*" element={<AdminLayout />}>
               <Route index element={<AdminOverview />} />
               <Route path="users" element={<AdminUsers />} />
@@ -46,7 +46,7 @@ export function App() {
               <Route path="audit" element={<AdminAudit />} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/app/profile" replace />} />
+            <Route path="*" element={<Navigate to="/app/generate" replace />} />
           </Routes>
         </BrowserRouter>
       </AdminProvider>
