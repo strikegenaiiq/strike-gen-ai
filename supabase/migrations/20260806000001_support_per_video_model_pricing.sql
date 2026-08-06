@@ -19,7 +19,6 @@ ON CONFLICT (model_id) DO UPDATE SET
   supported_resolutions = EXCLUDED.supported_resolutions,
   pricing_params = EXCLUDED.pricing_params,
   supports_duration = EXCLUDED.supports_duration,
-  supports_duration = EXCLUDED.supports_duration,
   description = EXCLUDED.description,
   active = EXCLUDED.active,
   updated_at = now();
