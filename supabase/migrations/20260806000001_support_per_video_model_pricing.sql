@@ -19,9 +19,26 @@ ON CONFLICT (model_id) DO UPDATE SET
   supported_resolutions = EXCLUDED.supported_resolutions,
   pricing_params = EXCLUDED.pricing_params,
   supports_duration = EXCLUDED.supports_duration,
+  supports_duration = EXCLUDED.supports_duration,
   description = EXCLUDED.description,
   active = EXCLUDED.active,
   updated_at = now();
+
+UPDATE public.ai_models
+SET pricing_params = jsonb_build_object(
+  'kind','video',
+  'costPerSecond', jsonb_build_object('720p',0.24),
+  'defaultResolution','720p',
+  'minDurationSeconds',5,
+  'maxDurationSeconds',6,
+  'defaultAspectRatio','16:9',
+  'framesPerSecond',16,
+  'minFrames',80,
+  'maxFrames',100,
+  'replicateModel','wavespeedai/wan-2.1-t2v-720p'
+),
+updated_at = now()
+WHERE model_id = 'wan-2.1-t2v-720p';
 
 CREATE OR REPLACE FUNCTION public.calculate_generation_cost(
   p_model_id text,
