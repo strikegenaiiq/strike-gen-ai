@@ -23,12 +23,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function jsonResponse(body, status = 200) {
+function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...corsHeaders } });
 }
 
-const REPLICATE_MODEL_VERSIONS = {
+const REPLICATE_MODELS: Record<string, string> = {
   "wan-2.1-t2v-720p": "wavespeedai/wan-2.1-t2v-720p",
+  "wan-2.2-5b-fast": "wan-video/wan-2.2-5b-fast",
 };
 
 Deno.serve(async (req) => {
@@ -47,33 +48,54 @@ Deno.serve(async (req) => {
   if (userError || !userData?.user) return jsonResponse({ error: "Not authenticated" }, 401);
   const userId = userData.user.id;
 
-  let body;
+  let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
-  const { modelId, prompt, durationSeconds, resolution } = body;
-  if (!modelId || !prompt) return jsonResponse({ error: "modelId and prompt are required" }, 400);
+  const modelId = typeof body.modelId === "string" ? body.modelId : "";
+  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+  const requestedDuration = typeof body.durationSeconds === "number" ? body.durationSeconds : undefined;
+  const requestedResolution = typeof body.resolution === "string" ? body.resolution : undefined;
+  const requestedAspectRatio = typeof body.aspectRatio === "string" ? body.aspectRatio : undefined;
+  const requestedSeed = Number.isInteger(body.seed) ? body.seed as number : undefined;
 
-  const replicateVersion = REPLICATE_MODEL_VERSIONS[modelId];
-  if (!replicateVersion) {
+  if (!modelId || !prompt) return jsonResponse({ error: "modelId and prompt are required" }, 400);
+  if (prompt.length > 4000) return jsonResponse({ error: "Prompt is too long" }, 400);
+
+  const replicateModel = REPLICATE_MODELS[modelId];
+  if (!replicateModel) {
     return jsonResponse({ error: `Model ${modelId} is not yet wired up for generation` }, 400);
   }
 
   try {
     const { data: model, error: modelError } = await supabaseAdmin
       .from("ai_models")
-      .select("model_type, active, pricing_params, provider")
+      .select("model_type, active, pricing_unit, pricing_params, provider")
       .eq("model_id", modelId)
       .single();
     if (modelError || !model || !model.active || model.model_type !== "video") {
       return jsonResponse({ error: "Model not found, inactive, or not a video model" }, 404);
     }
 
-    const finalDuration = durationSeconds ?? model.pricing_params.minDurationSeconds ?? 5;
-    const finalResolution = resolution ?? model.pricing_params.defaultResolution;
+    const pricingParams = model.pricing_params ?? {};
+    const minDuration = Number(pricingParams.minDurationSeconds ?? 5);
+    const maxDuration = Number(pricingParams.maxDurationSeconds ?? minDuration);
+    const finalDuration = requestedDuration ?? minDuration;
+    const finalResolution = requestedResolution ?? pricingParams.defaultResolution;
+
+    if (!Number.isFinite(finalDuration) || finalDuration < minDuration || finalDuration > maxDuration) {
+      return jsonResponse({ error: `Duration must be between ${minDuration} and ${maxDuration} seconds` }, 400);
+    }
+
+    const supportedResolutions = pricingParams.costPerVideo
+      ? Object.keys(pricingParams.costPerVideo)
+      : Object.keys(pricingParams.costPerSecond ?? {});
+    if (!finalResolution || !supportedResolutions.includes(finalResolution)) {
+      return jsonResponse({ error: "Unsupported resolution for selected model" }, 400);
+    }
 
     const { data: costData, error: costError } = await supabaseAdmin.rpc("calculate_generation_cost", {
       p_model_id: modelId,
@@ -110,6 +132,32 @@ Deno.serve(async (req) => {
       projectId = newProject.id;
     }
 
+    const isPerVideo = model.pricing_unit === "per_video";
+    const framesPerSecond = Number(pricingParams.framesPerSecond ?? 16);
+    const minFrames = Number(pricingParams.minFrames ?? 81);
+    const maxFrames = Number(pricingParams.maxFrames ?? 121);
+    const numFrames = isPerVideo
+      ? Math.min(maxFrames, Math.max(minFrames, Math.round(finalDuration * framesPerSecond)))
+      : undefined;
+    const aspectRatio = requestedAspectRatio ?? pricingParams.defaultAspectRatio ?? "16:9";
+
+    const providerInput = isPerVideo
+      ? {
+          prompt,
+          num_frames: numFrames,
+          resolution: finalResolution,
+          aspect_ratio: aspectRatio,
+          frames_per_second: framesPerSecond,
+          go_fast: true,
+          ...(requestedSeed !== undefined ? { seed: requestedSeed } : {}),
+        }
+      : {
+          prompt,
+          duration: finalDuration,
+          resolution: finalResolution,
+          ...(requestedSeed !== undefined ? { seed: requestedSeed } : {}),
+        };
+
     const { data: job, error: jobError } = await supabaseAdmin
       .from("generation_jobs")
       .insert({
@@ -117,23 +165,29 @@ Deno.serve(async (req) => {
         project_id: projectId,
         provider: model.provider,
         model: modelId,
-        request: { prompt, duration_seconds: finalDuration, resolution: finalResolution, tokens_to_charge: tokensToCharge },
+        request: {
+          prompt,
+          duration_seconds: finalDuration,
+          resolution: finalResolution,
+          aspect_ratio: aspectRatio,
+          tokens_to_charge: tokensToCharge,
+          provider_input: providerInput,
+        },
         status: "queued",
         progress: 0,
       })
-      .select("id")
+      .select("id, request")
       .single();
     if (jobError) throw new Error(`Failed to create generation job: ${jobError.message}`);
 
-    const resp = await fetch("https://api.replicate.com/v1/predictions", {
+    const resp = await fetch(`https://api.replicate.com/v1/models/${replicateModel}/predictions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        version: replicateVersion,
-        input: { prompt, duration: finalDuration, resolution: finalResolution },
+        input: providerInput,
         webhook: `${BACKEND_BASE_URL}/functions/v1/generation-webhook?job_id=${job.id}`,
         webhook_events_filter: ["completed"],
       }),
@@ -143,7 +197,10 @@ Deno.serve(async (req) => {
 
     await supabaseAdmin
       .from("generation_jobs")
-      .update({ status: "processing", request: { ...job.request, provider_job_id: replicateData.id } })
+      .update({
+        status: "processing",
+        request: { ...job.request, provider_job_id: replicateData.id, replicate_model: replicateModel },
+      })
       .eq("id", job.id);
 
     return jsonResponse({ jobId: job.id, status: "processing", tokensToCharge });
