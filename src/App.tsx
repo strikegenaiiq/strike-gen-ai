@@ -5,6 +5,7 @@ import { AdminLayout } from "@/admin/AdminLayout";
 import { SignInPage } from "@/auth/SignInPage";
 import { SignUpPage } from "@/auth/SignUpPage";
 import { GeneratePage } from "@/app/GeneratePage";
+import { CreatorAdvisorPage } from "@/app/CreatorAdvisorPage";
 import { ProfilePage } from "@/app/ProfilePage";
 import { StudioHome } from "@/app/StudioHome";
 
@@ -33,6 +34,7 @@ function AppRoutes() {
       <Route path="/" element={<Navigate to="/app" replace />} />
       <Route path="/app" element={<Protected><StudioHome /></Protected>} />
       <Route path="/app/generate" element={<Protected><GeneratePage /></Protected>} />
+      <Route path="/app/advisor" element={<Protected><CreatorAdvisorPage /></Protected>} />
       <Route path="/app/profile" element={<Protected><ProfilePage /></Protected>} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminHome />} />
