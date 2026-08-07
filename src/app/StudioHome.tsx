@@ -4,8 +4,8 @@ import { AppShell } from "./AppShell";
 
 const actions = [
   { title: "Create video", text: "Turn a prompt into a video with the models available on your plan.", to: "/app/generate" },
-  { title: "Creator Advisor", text: "Plan scripts, hooks, shots and publishing ideas with usage-based AI assistance.", to: "/app/advisor" },
-  { title: "Projects", text: "Keep your generated work and drafts together as the studio grows.", to: "/app/projects" },
+  { title: "Creator Advisor", text: "The usage-based planning assistant is the next studio tool being connected.", to: "/app/profile" },
+  { title: "Projects", text: "Your generated work and saved drafts will stay together as the project layer is completed.", to: "/app/generate" },
 ];
 
 export function StudioHome() {
@@ -17,25 +17,16 @@ export function StudioHome() {
       <div className="space-y-8">
         <section className="overflow-hidden rounded-2xl bg-ink-900 px-6 py-8 text-white sm:px-8">
           <p className="text-sm font-medium text-brand-200">Strike Gen AI</p>
-          <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-            Welcome back, {firstName}.
-          </h2>
+          <h2 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">Welcome back, {firstName}.</h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-ink-200 sm:text-base">
-            Create, plan and refine your next piece of content from one focused workspace.
-            Your plan controls the models you can use and the backend controls the real credit charge.
+            Create, plan and refine your next piece of content from one focused workspace. Your plan controls the models you can use and the backend controls the real credit charge.
           </p>
-          <Link to="/app/generate" className="btn-primary mt-6 inline-flex">
-            Start creating
-          </Link>
+          <Link to="/app/generate" className="btn-primary mt-6 inline-flex">Start creating</Link>
         </section>
 
         <section>
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-ink-900">Your creative workspace</h2>
-              <p className="mt-1 text-sm text-ink-500">The tools we are building around the creator workflow.</p>
-            </div>
-          </div>
+          <h2 className="text-lg font-semibold text-ink-900">Your creative workspace</h2>
+          <p className="mt-1 text-sm text-ink-500">The tools we are building around the creator workflow.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             {actions.map((action) => (
               <Link key={action.title} to={action.to} className="card group p-5 transition hover:-translate-y-0.5 hover:shadow-md">
@@ -48,17 +39,12 @@ export function StudioHome() {
         </section>
 
         <section className="card p-6">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-ink-900">Seeing is believing</h2>
-              <p className="mt-1 text-sm text-ink-500">Your showcase feed will live here — generated work first, explanations second.</p>
-            </div>
-            <span className="text-xs font-medium text-ink-400">Showcase layer</span>
-          </div>
+          <h2 className="text-lg font-semibold text-ink-900">Seeing is believing</h2>
+          <p className="mt-1 text-sm text-ink-500">Generated work first, explanations second. This becomes the showcase layer for Strike.</p>
           <div className="mt-5 grid min-h-48 place-items-center rounded-xl border border-dashed border-ink-200 bg-ink-50 p-8 text-center">
             <div>
               <p className="font-medium text-ink-700">Your generated showcase is coming together.</p>
-              <p className="mt-1 text-sm text-ink-500">Once the showcase assets are connected, visitors will see the product in action immediately.</p>
+              <p className="mt-1 text-sm text-ink-500">The public showcase feed will be connected after the creator workflow is complete.</p>
             </div>
           </div>
         </section>
