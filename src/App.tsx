@@ -7,6 +7,7 @@ import { SignUpPage } from "@/auth/SignUpPage";
 import { GeneratePage } from "@/app/GeneratePage";
 import { CreatorAdvisorPage } from "@/app/CreatorAdvisorPage";
 import { CreditsPage } from "@/app/CreditsPage";
+import { PlansPage } from "@/app/PlansPage";
 import { ProfilePage } from "@/app/ProfilePage";
 import { StudioHome } from "@/app/StudioHome";
 
@@ -29,6 +30,7 @@ function AppRoutes() {
     <Route path="/app/generate" element={<Protected><GeneratePage /></Protected>} />
     <Route path="/app/advisor" element={<Protected><CreatorAdvisorPage /></Protected>} />
     <Route path="/app/credits" element={<Protected><CreditsPage /></Protected>} />
+    <Route path="/app/plans" element={<Protected><PlansPage /></Protected>} />
     <Route path="/app/profile" element={<Protected><ProfilePage /></Protected>} />
     <Route path="/admin" element={<AdminLayout />}><Route index element={<AdminHome />} /></Route>
     <Route path="*" element={<Navigate to="/app" replace />} />
