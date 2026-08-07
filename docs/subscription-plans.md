@@ -1,133 +1,48 @@
 # STRIKE GEN AI — Subscription Plans
 
-Version: 0.1
+Version: 0.2
+Date: 2026-08-07
+Status: Current product positioning
 
-Date: 2026-07-09
+## Plan catalog
 
-Author: STRIKE GEN AI Product Team
+| Plan | Monthly price | Included credits | Positioning |
+|---|---:|---:|---|
+| Standard | $19 | 300 | Entry paid creator plan |
+| Pro | $49 | 1,000 | Frequent creators |
+| Premium | $99 | 2,500 | Serious/high-volume creators |
+| Creator | $249 | 7,000 | Highest self-serve creator tier |
 
----
+There is **no Free plan and no free trial** in the current product positioning. Users must subscribe to a paid plan to access paid creation capacity and the metered Creator Advisor.
 
-## 1. Overview
+## Credit economics
 
-This document defines the subscription plan catalog, entitlements, lifecycle, and billing rules. It is a planning-stage document; prices and credit allotments are illustrative and will be tuned against unit economics.
+Credits are the platform's usage unit. Provider cost is never exposed as the user's price. The server owns the final credit calculation, reservation, settlement, and refund behavior.
 
-See also:
-- [AI Pricing & Credit System](ai-pricing-and-credit-system.md) — how credits are consumed.
-- [Credit Top-Up System](credit-topup-system.md) — buying credits outside a plan.
-- [Business Model](business-model.md) — pricing strategy.
+Each model/request is priced from its verified provider cost and Strike's commercial margin policy. The frontend must display server-provided estimates/results and must not become the source of truth for charges.
 
----
+Creator Advisor usage follows the same credit economy. It is not an unlimited free conversation. Its input/output rates remain disabled until the provider model and verified provider economics are configured.
 
-## 2. Plan Catalog
+## Billing
 
-| Plan | Monthly Price | Annual Price | Included Credits | Target |
-|---|---|---|---|---|
-| Free | $0 | $0 | 10 trial credits | New users, exploration |
-| Creator | $19 | $190 | 200 / month | Casual creators |
-| Pro | $99 | $990 | 1,500 / month | Frequent creators, small agencies |
-| Enterprise | Custom | Custom | Custom | Large teams, high volume |
+Self-serve subscriptions use Paystack recurring billing. Checkout is initialized server-side from the active plan's stored USD price and the current FX conversion used by the payment flow. Payment fulfillment is verified server-side before credits or subscription access are granted.
 
-Annual billing reflects a ~2 months free discount versus monthly.
+Recurring lifecycle requirements:
+- successful initial payment activates the selected plan;
+- successful renewal allocates the plan's recurring credits;
+- failed renewal enters the configured payment-failure/grace workflow;
+- cancellation preserves access through the paid period where supported by the provider;
+- re-subscription/reactivation is supported without requiring a new account;
+- payment and credit records remain auditable.
 
----
+## Credit allocation
 
-## 3. Entitlements
+On subscription start or renewal, included credits are recorded through the canonical credit ledger. Credits do not silently bypass the ledger and are not granted by frontend state.
 
-| Feature | Free | Creator | Pro | Enterprise |
-|---|---|---|---|---|
-| Video generation | 720p only | up to 1080p | up to 4K | up to 4K |
-| Image generation | 1024px, 1/output | 1024px, 4/output | 2048px upscaled | 2048px upscaled |
-| Audio generation | TTS only | TTS + music | TTS + music | TTS + music |
-| Projects | 3 | Unlimited | Unlimited | Unlimited |
-| Asset retention | 30 days | 90 days | 1 year | Custom |
-| Priority queue | No | No | Yes | Yes |
-| Team seats | 1 | 1 | 3 | Custom |
-| Admin analytics | No | No | No | Yes |
-| Support | Community | Email | Priority email | Dedicated + SLA |
+## Entitlements
 
-Entitlements are stored as JSON on `subscription_plans.entitlements` and enforced at the API layer via feature flags; see [Feature Flags](feature-flags.md).
+Model and feature access is determined by the user's active subscription and server-side entitlements. The frontend may hide unavailable options for a clean experience, but the backend remains authoritative.
 
----
+## Production rule
 
-## 4. Lifecycle
-
-States (on `user_subscriptions.status`):
-- `trialing` — in a free trial; credits allocated but not yet billed.
-- `active` — paid and current.
-- `past_due` — renewal payment failed; grace period before downgrade.
-- `cancelled` — user cancelled; remains active until period end then downgrades to Free.
-
-Transitions:
-- New subscription → `trialing` (if trial offered) or `active` (if paid immediately).
-- Renewal success → stays `active`; new credits allocated.
-- Renewal failure → `past_due`; retry per dunning schedule; downgrade to Free after grace period.
-- User cancel → `cancelled`; entitlements persist until `current_period_end`.
-- Reactivation → back to `active` on next successful payment.
-
----
-
-## 5. Upgrade and Downgrade
-
-### Upgrade
-- Effective immediately.
-- Prorated charge for the remainder of the current period.
-- Credit difference for the higher plan allocated immediately.
-
-### Downgrade
-- Scheduled for the end of the current billing period (no immediate refund).
-- User keeps current plan entitlements until period end.
-- On renewal, the new (lower) plan applies with its credit allotment.
-
-All changes are shown to the user with billing implications before confirmation.
-
----
-
-## 6. Credit Allocation
-
-- On subscription start or renewal, included credits are added via a `credit_transactions` entry with `reason = subscription`.
-- Monthly allotments reset on each renewal — they do **not** roll over.
-- Trial credits are allocated on trial start and expire at trial end if not converted.
-
----
-
-## 7. Trials and Promotions
-
-- Free trials grant limited-time access to a paid plan's entitlements.
-- Promotional codes may discount a plan or grant bonus credits.
-- Promotions are time-limited and tracked separately from standard credits.
-- Abuse controls: one trial per user/device/payment method; rate-limited redemption.
-
----
-
-## 8. Billing
-
-- Subscriptions are billed via the payment processor's recurring billing.
-- Invoices are generated by the processor and mirrored in the `invoices` table.
-- Users can view billing history and download invoices from the billing page.
-- Payment failures trigger dunning emails and a grace period before downgrade.
-
-See [API Specification](api-specification.md) §Subscriptions and Payments for endpoint contracts.
-
----
-
-## 9. Enterprise
-
-- Custom pricing, credit allotments, and entitlements.
-- Contracted billing (annual or invoiced) rather than self-serve checkout.
-- Additional features: SSO, data residency, audit exports, dedicated support, SLA.
-- Provisioned via sales/admin workflow, not self-service signup.
-
----
-
-## 10. Future Considerations
-
-- **Team plans** — organization-level billing with per-seat pricing and shared credit pools.
-- **Add-ons** — purchase extra entitlements (e.g., 4K for Creator) without a full plan change.
-- **Regional pricing** — localized pricing for high-growth markets.
-
----
-
-## Revision History
-
-- 0.1 — Initial subscription plans (2026-07-09)
+Do not activate a model, Advisor pricing rule, plan, or payment route unless its provider economics, entitlement, accounting, and fulfillment path have been verified together.
