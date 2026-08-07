@@ -46,7 +46,11 @@ export function GeneratePage() {
 
   useEffect(() => {
     const loadModels = async () => {
-      if (!session) return;
+      if (!session) {
+        setModels([]);
+        setSelectedModelId("");
+        return;
+      }
 
       const { data: subscription } = await supabase
         .from("subscriptions")
@@ -98,15 +102,23 @@ export function GeneratePage() {
   }, [session]);
 
   const refreshJobsAndAssets = async () => {
+    if (!session) {
+      setJobs([]);
+      setAssets([]);
+      return;
+    }
+
     const [{ data: jobData }, { data: assetData }] = await Promise.all([
       supabase
         .from("generation_jobs")
         .select("id, model, status, progress, request, created_at")
+        .eq("user_id", session.user.id)
         .order("created_at", { ascending: false })
         .limit(10),
       supabase
         .from("generated_assets")
         .select("id, storage_url, generation_status, error_message, created_at")
+        .eq("user_id", session.user.id)
         .order("created_at", { ascending: false })
         .limit(10),
     ]);
@@ -116,10 +128,12 @@ export function GeneratePage() {
   };
 
   useEffect(() => {
+    if (!session) return;
+
     void refreshJobsAndAssets();
     const interval = setInterval(() => void refreshJobsAndAssets(), 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [session?.user.id]);
 
   const selectedModel = models.find((m) => m.model_id === selectedModelId);
 
@@ -162,10 +176,10 @@ export function GeneratePage() {
 
   return (
     <AppShell title="Generate Video">
-      <div className="max-w-2xl mx-auto space-y-8">
+      <div className="mx-auto max-w-2xl space-y-8">
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Model</label>
+            <label className="mb-1 block text-sm font-medium">Model</label>
             <select
               value={selectedModelId}
               onChange={(e) => {
@@ -176,7 +190,7 @@ export function GeneratePage() {
                   setResolution(model.pricing_params.defaultResolution);
                 }
               }}
-              className="w-full border rounded-md px-3 py-2"
+              className="w-full rounded-md border px-3 py-2"
               disabled={models.length === 0}
             >
               {models.map((m) => (
@@ -189,12 +203,12 @@ export function GeneratePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Prompt</label>
+            <label className="mb-1 block text-sm font-medium">Prompt</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={3}
-              className="w-full border rounded-md px-3 py-2"
+              className="w-full rounded-md border px-3 py-2"
               placeholder="Describe the video you want to generate..."
               required
             />
@@ -203,7 +217,7 @@ export function GeneratePage() {
           {selectedModel && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Duration (seconds): {duration}</label>
+                <label className="mb-1 block text-sm font-medium">Duration (seconds): {duration}</label>
                 <input
                   type="range"
                   min={selectedModel.pricing_params.minDurationSeconds}
@@ -214,8 +228,8 @@ export function GeneratePage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Resolution</label>
-                <select value={resolution} onChange={(e) => setResolution(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                <label className="mb-1 block text-sm font-medium">Resolution</label>
+                <select value={resolution} onChange={(e) => setResolution(e.target.value)} className="w-full rounded-md border px-3 py-2">
                   {Object.keys(selectedModel.pricing_params.costPerSecond).map((res) => (
                     <option key={res} value={res}>{res}</option>
                   ))}
@@ -224,27 +238,31 @@ export function GeneratePage() {
             </div>
           )}
 
+          <p className="text-xs leading-5 text-ink-500">
+            Your plan determines model access. The server calculates the final credit charge when you submit; this screen never trusts a client-supplied credit amount.
+          </p>
+
           {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
           <button
             type="submit"
             disabled={submitting || !selectedModelId || !prompt.trim()}
-            className="w-full bg-black text-white rounded-md py-2 disabled:opacity-50"
+            className="w-full rounded-md bg-black py-2 text-white disabled:opacity-50"
           >
             {submitting ? "Submitting..." : "Generate"}
           </button>
         </form>
 
         <section>
-          <h2 className="text-lg font-medium mb-3">Recent Jobs</h2>
+          <h2 className="mb-3 text-lg font-medium">Recent Jobs</h2>
           <ul className="space-y-2">
             {jobs.map((job) => (
-              <li key={job.id} className="border rounded-md p-3 text-sm">
+              <li key={job.id} className="rounded-md border p-3 text-sm">
                 <div className="flex justify-between">
                   <span>{job.model}</span>
                   <span className="capitalize">{job.status}</span>
                 </div>
-                <p className="text-gray-500 truncate">{job.request?.prompt}</p>
+                <p className="truncate text-gray-500">{job.request?.prompt}</p>
               </li>
             ))}
             {jobs.length === 0 && <p className="text-sm text-gray-500">No jobs yet.</p>}
@@ -252,10 +270,10 @@ export function GeneratePage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-medium mb-3">Results</h2>
+          <h2 className="mb-3 text-lg font-medium">Results</h2>
           <div className="grid grid-cols-2 gap-3">
             {assets.map((asset) => (
-              <div key={asset.id} className="border rounded-md p-2">
+              <div key={asset.id} className="rounded-md border p-2">
                 {asset.generation_status === "completed" && asset.storage_url ? (
                   <video src={asset.storage_url} controls className="w-full rounded" />
                 ) : asset.generation_status === "failed" ? (
