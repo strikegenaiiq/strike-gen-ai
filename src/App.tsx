@@ -32,8 +32,6 @@ interface GeneratedAsset {
   created_at: string;
 }
 
-const ENABLED_MODEL_IDS = ["wan-2.1-t2v-720p"];
-
 export function GeneratePage() {
   const { session } = useAuth();
   const [models, setModels] = useState<VideoModel[]>([]);
@@ -47,25 +45,72 @@ export function GeneratePage() {
   const [assets, setAssets] = useState<GeneratedAsset[]>([]);
 
   useEffect(() => {
-    supabase
-      .from("ai_models")
-      .select("model_id, display_name, provider, pricing_params")
-      .eq("model_type", "video")
-      .eq("active", true)
-      .then(({ data }) => {
-        if (data) {
-          setModels(data as VideoModel[]);
-          const firstEnabled = data.find((m) => ENABLED_MODEL_IDS.includes(m.model_id));
-          if (firstEnabled) {
-            setSelectedModelId(firstEnabled.model_id);
-            setDuration(firstEnabled.pricing_params.minDurationSeconds);
-            setResolution(firstEnabled.pricing_params.defaultResolution);
-          }
-        }
-      });
-  }, []);
+    if (!session?.user.id) {
+      setModels([]);
+      setSelectedModelId("");
+      return;
+    }
+
+    const loadEntitledModels = async () => {
+      const { data: subscription, error: subscriptionError } = await supabase
+        .from("subscriptions")
+        .select("plan_id")
+        .eq("user_id", session.user.id)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (subscriptionError || !subscription) {
+        setModels([]);
+        setSelectedModelId("");
+        return;
+      }
+
+      const { data: entitlements, error: entitlementError } = await supabase
+        .from("subscription_model_entitlements")
+        .select("model_id")
+        .eq("plan_id", subscription.plan_id)
+        .eq("enabled", true);
+
+      if (entitlementError || !entitlements?.length) {
+        setModels([]);
+        setSelectedModelId("");
+        return;
+      }
+
+      const entitledModelIds = entitlements.map((item) => item.model_id);
+      const { data, error } = await supabase
+        .from("ai_models")
+        .select("model_id, display_name, provider, pricing_params")
+        .eq("model_type", "video")
+        .eq("active", true)
+        .in("model_id", entitledModelIds);
+
+      if (error || !data) {
+        setModels([]);
+        setSelectedModelId("");
+        return;
+      }
+
+      const nextModels = data as VideoModel[];
+      setModels(nextModels);
+      const firstModel = nextModels[0];
+      if (firstModel) {
+        setSelectedModelId(firstModel.model_id);
+        setDuration(firstModel.pricing_params.minDurationSeconds);
+        setResolution(firstModel.pricing_params.defaultResolution);
+      } else {
+        setSelectedModelId("");
+      }
+    };
+
+    void loadEntitledModels();
+  }, [session?.user.id]);
 
   const refreshJobsAndAssets = async () => {
+    if (!session?.user.id) return;
+
     const [{ data: jobData }, { data: assetData }] = await Promise.all([
       supabase
         .from("generation_jobs")
@@ -83,10 +128,10 @@ export function GeneratePage() {
   };
 
   useEffect(() => {
-    refreshJobsAndAssets();
-    const interval = setInterval(refreshJobsAndAssets, 5000);
+    void refreshJobsAndAssets();
+    const interval = setInterval(() => void refreshJobsAndAssets(), 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [session?.user.id]);
 
   const selectedModel = models.find((m) => m.model_id === selectedModelId);
 
@@ -145,17 +190,19 @@ export function GeneratePage() {
                 }
               }}
               className="w-full border rounded-md px-3 py-2"
+              disabled={!models.length}
             >
               {models.map((m) => (
-                <option
-                  key={m.model_id}
-                  value={m.model_id}
-                  disabled={!ENABLED_MODEL_IDS.includes(m.model_id)}
-                >
-                  {m.display_name} {!ENABLED_MODEL_IDS.includes(m.model_id) ? "(coming soon)" : ""}
+                <option key={m.model_id} value={m.model_id}>
+                  {m.display_name}
                 </option>
               ))}
             </select>
+            {!models.length && (
+              <p className="mt-1 text-sm text-gray-500">
+                Subscribe to a plan with video generation access to continue.
+              </p>
+            )}
           </div>
 
           <div>
