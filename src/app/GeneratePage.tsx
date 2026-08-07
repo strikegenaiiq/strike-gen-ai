@@ -3,57 +3,127 @@ import { useAuth } from "@/auth/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { AppShell } from "./AppShell";
 
-const ENABLED_MODEL_IDS = ["wan-2.1-t2v-720p"];
+interface VideoModel {
+  model_id: string;
+  display_name: string;
+  provider: string;
+  pricing_params: {
+    costPerSecond: Record<string, number>;
+    defaultResolution: string;
+    minDurationSeconds: number;
+    maxDurationSeconds: number;
+  };
+}
+
+interface GenerationJob {
+  id: string;
+  model: string;
+  status: string;
+  progress: number;
+  request: { prompt?: string };
+  created_at: string;
+}
+
+interface GeneratedAsset {
+  id: string;
+  storage_url: string | null;
+  generation_status: string;
+  error_message: string | null;
+  created_at: string;
+}
 
 export function GeneratePage() {
   const { session } = useAuth();
-  const [models, setModels] = useState([]);
+  const [models, setModels] = useState<VideoModel[]>([]);
   const [selectedModelId, setSelectedModelId] = useState("");
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState(5);
   const [resolution, setResolution] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState(null);
-  const [jobs, setJobs] = useState([]);
-  const [assets, setAssets] = useState([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<GenerationJob[]>([]);
+  const [assets, setAssets] = useState<GeneratedAsset[]>([]);
 
   useEffect(() => {
-    supabase
-      .from("ai_models")
-      .select("model_id, display_name, provider, pricing_params")
-      .eq("model_type", "video")
-      .eq("active", true)
-      .then(({ data }) => {
-        if (data) {
-          setModels(data);
-          const firstEnabled = data.find((m) => ENABLED_MODEL_IDS.includes(m.model_id));
-          if (firstEnabled) {
-            setSelectedModelId(firstEnabled.model_id);
-            setDuration(firstEnabled.pricing_params.minDurationSeconds);
-            setResolution(firstEnabled.pricing_params.defaultResolution);
-          }
-        }
-      });
-  }, []);
+    const loadModels = async () => {
+      if (!session) return;
+
+      const { data: subscription } = await supabase
+        .from("subscriptions")
+        .select("plan_id")
+        .eq("user_id", session.user.id)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!subscription?.plan_id) {
+        setModels([]);
+        setSelectedModelId("");
+        return;
+      }
+
+      const { data: entitlements } = await supabase
+        .from("subscription_model_entitlements")
+        .select("model_id")
+        .eq("plan_id", subscription.plan_id)
+        .eq("enabled", true);
+
+      const entitledIds = (entitlements ?? []).map((item) => item.model_id);
+      if (entitledIds.length === 0) {
+        setModels([]);
+        setSelectedModelId("");
+        return;
+      }
+
+      const { data } = await supabase
+        .from("ai_models")
+        .select("model_id, display_name, provider, pricing_params")
+        .eq("model_type", "video")
+        .eq("active", true)
+        .in("model_id", entitledIds);
+
+      const availableModels = (data ?? []) as VideoModel[];
+      setModels(availableModels);
+
+      const firstModel = availableModels[0];
+      if (firstModel) {
+        setSelectedModelId(firstModel.model_id);
+        setDuration(firstModel.pricing_params.minDurationSeconds);
+        setResolution(firstModel.pricing_params.defaultResolution);
+      }
+    };
+
+    void loadModels();
+  }, [session]);
 
   const refreshJobsAndAssets = async () => {
     const [{ data: jobData }, { data: assetData }] = await Promise.all([
-      supabase.from("generation_jobs").select("id, model, status, progress, request, created_at").order("created_at", { ascending: false }).limit(10),
-      supabase.from("generated_assets").select("id, storage_url, generation_status, error_message, created_at").order("created_at", { ascending: false }).limit(10),
+      supabase
+        .from("generation_jobs")
+        .select("id, model, status, progress, request, created_at")
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("generated_assets")
+        .select("id, storage_url, generation_status, error_message, created_at")
+        .order("created_at", { ascending: false })
+        .limit(10),
     ]);
-    if (jobData) setJobs(jobData);
-    if (assetData) setAssets(assetData);
+
+    if (jobData) setJobs(jobData as GenerationJob[]);
+    if (assetData) setAssets(assetData as GeneratedAsset[]);
   };
 
   useEffect(() => {
-    refreshJobsAndAssets();
-    const interval = setInterval(refreshJobsAndAssets, 5000);
+    void refreshJobsAndAssets();
+    const interval = setInterval(() => void refreshJobsAndAssets(), 5000);
     return () => clearInterval(interval);
   }, []);
 
   const selectedModel = models.find((m) => m.model_id === selectedModelId);
 
-  const onSubmit = async (e) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!session || !selectedModelId || !prompt.trim()) return;
 
@@ -61,19 +131,23 @@ export function GeneratePage() {
     setSubmitError(null);
 
     try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-video`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          modelId: selectedModelId,
-          prompt: prompt.trim(),
-          durationSeconds: duration,
-          resolution,
-        }),
-      });
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-video`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            modelId: selectedModelId,
+            prompt: prompt.trim(),
+            durationSeconds: duration,
+            resolution,
+          }),
+        }
+      );
+
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error ?? "Generation failed");
 
@@ -87,10 +161,8 @@ export function GeneratePage() {
   };
 
   return (
-    <AppShell>
-      <div className="max-w-2xl mx-auto p-6 space-y-8">
-        <h1 className="text-2xl font-semibold">Generate Video</h1>
-
+    <AppShell title="Generate Video">
+      <div className="max-w-2xl mx-auto space-y-8">
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Model</label>
@@ -105,13 +177,15 @@ export function GeneratePage() {
                 }
               }}
               className="w-full border rounded-md px-3 py-2"
+              disabled={models.length === 0}
             >
               {models.map((m) => (
-                <option key={m.model_id} value={m.model_id} disabled={!ENABLED_MODEL_IDS.includes(m.model_id)}>
-                  {m.display_name} {!ENABLED_MODEL_IDS.includes(m.model_id) ? "(coming soon)" : ""}
-                </option>
+                <option key={m.model_id} value={m.model_id}>{m.display_name}</option>
               ))}
             </select>
+            {models.length === 0 && (
+              <p className="mt-1 text-sm text-ink-500">An active subscription with available video models is required.</p>
+            )}
           </div>
 
           <div>
@@ -152,7 +226,11 @@ export function GeneratePage() {
 
           {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-          <button type="submit" disabled={submitting || !selectedModelId || !prompt.trim()} className="w-full bg-black text-white rounded-md py-2 disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={submitting || !selectedModelId || !prompt.trim()}
+            className="w-full bg-black text-white rounded-md py-2 disabled:opacity-50"
+          >
             {submitting ? "Submitting..." : "Generate"}
           </button>
         </form>
