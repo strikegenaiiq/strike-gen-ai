@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/auth/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { estimateGenerationCost } from "@/lib/generationCost";
 import { AppShell } from "./AppShell";
 
 type Scope = "standard" | "premium";
@@ -133,15 +134,16 @@ export function GeneratePage() {
       return;
     }
     let cancelled = false;
-    supabase
-      .rpc("calculate_generation_cost", {
-        p_model_id: selectedModel.model_id,
-        p_duration_seconds: duration,
-        p_resolution: resolution,
+    estimateGenerationCost({
+      modelId: selectedModel.model_id,
+      durationSeconds: duration,
+      resolution,
+    })
+      .then((tokens) => {
+        if (!cancelled) setEstimatedCredits(tokens);
       })
-      .then(({ data, error }) => {
-        if (!cancelled && !error && data?.[0]) setEstimatedCredits(Number(data[0].tokens_to_charge));
-        if (!cancelled && error) setEstimatedCredits(null);
+      .catch(() => {
+        if (!cancelled) setEstimatedCredits(null);
       });
     return () => {
       cancelled = true;
