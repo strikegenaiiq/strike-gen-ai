@@ -1,0 +1,1 @@
+The public showcase is designed as immediate visual proof: promotional videos should autoplay muted, loop, and play inline when the browser allows autoplay. Controls remain available for visitor control.
