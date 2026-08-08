@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { useAdmin } from "@/admin/AdminContext";
+import { StudioDraftBridge } from "./StudioDraftBridge";
 
 export function AppShell({
   children,
@@ -24,6 +25,7 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-[#08090b] text-white">
+      <StudioDraftBridge />
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#08090b]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <NavLink to="/app/generate" className="flex items-center gap-3">
