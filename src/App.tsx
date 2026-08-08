@@ -14,6 +14,7 @@ import { AdminUsers } from "@/admin/AdminUsers";
 import { AdminPayments } from "@/admin/AdminPayments";
 import { AdminFraud } from "@/admin/AdminFraud";
 import { AdminAudit } from "@/admin/AdminAudit";
+import { AdminContentStudio } from "@/admin/AdminContentStudio";
 
 export function App() {
   return (
@@ -47,6 +48,7 @@ export function App() {
               <Route path="payments" element={<AdminPayments />} />
               <Route path="fraud" element={<AdminFraud />} />
               <Route path="audit" element={<AdminAudit />} />
+              <Route path="content" element={<AdminContentStudio />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/showcase" replace />} />
