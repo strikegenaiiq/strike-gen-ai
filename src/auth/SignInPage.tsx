@@ -2,17 +2,14 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { AuthLayout } from "./AuthLayout";
+import { GoogleAuthButton } from "./GoogleAuthButton";
 import { email, required, useField, validateAll } from "./validation";
 
 function friendlyAuthError(message: string): string {
-  if (message.includes("Invalid login credentials"))
-    return "Incorrect email or password. Please try again.";
-  if (message.includes("Email not confirmed"))
-    return "Email not confirmed. Contact support if this persists.";
-  if (message.includes("rate limit") || message.includes("too many"))
-    return "Too many attempts. Please wait a moment and try again.";
-  if (message.includes("network") || message.includes("Failed to fetch"))
-    return "Network error. Check your connection and try again.";
+  if (message.includes("Invalid login credentials")) return "Incorrect email or password. Please try again.";
+  if (message.includes("Email not confirmed")) return "Email not confirmed. Contact support if this persists.";
+  if (message.includes("rate limit") || message.includes("too many")) return "Too many attempts. Please wait a moment and try again.";
+  if (message.includes("network") || message.includes("Failed to fetch")) return "Network error. Check your connection and try again.";
   return message;
 }
 
@@ -42,9 +39,7 @@ export function SignInPage() {
       return;
     }
 
-    if (data.session) {
-      navigate("/app/profile", { replace: true });
-    }
+    if (data.session) navigate("/app/profile", { replace: true });
     setSubmitting(false);
   };
 
@@ -54,10 +49,8 @@ export function SignInPage() {
       subtitle="Sign in to continue to your studio."
       footer={
         <>
-          New to AI Studio?{" "}
-          <Link to="/signup" className="font-semibold text-brand-600 hover:text-brand-700">
-            Create an account
-          </Link>
+          New to Strike Gen AI?{" "}
+          <Link to="/signup" className="font-semibold text-brand-600 hover:text-brand-700">Create an account</Link>
         </>
       }
     >
@@ -66,49 +59,32 @@ export function SignInPage() {
           Account created. Sign in with your credentials.
         </div>
       )}
-      <form onSubmit={onSubmit} className="space-y-4" noValidate>
-        <div>
-          <label className="label" htmlFor="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            className="input"
-            placeholder="you@example.com"
-            value={emailF.value}
-            onChange={(e) => emailF.onChange(e.target.value)}
-            onBlur={emailF.setTouched}
-            aria-invalid={!!emailF.error}
-          />
-          {emailF.error && <p className="field-error">{emailF.error}</p>}
+
+      <div className="space-y-4">
+        <GoogleAuthButton label="Continue with Google" />
+        <div className="flex items-center gap-3 text-xs text-slate-400">
+          <div className="h-px flex-1 bg-slate-200" />
+          <span>or</span>
+          <div className="h-px flex-1 bg-slate-200" />
         </div>
 
-        <div>
-          <label className="label" htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            className="input"
-            placeholder="Your password"
-            value={password.value}
-            onChange={(e) => password.onChange(e.target.value)}
-            onBlur={password.setTouched}
-            aria-invalid={!!password.error}
-          />
-          {password.error && <p className="field-error">{password.error}</p>}
-        </div>
-
-        {formError && (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-sm text-rose-700">
-            {formError}
+        <form onSubmit={onSubmit} className="space-y-4" noValidate>
+          <div>
+            <label className="label" htmlFor="email">Email</label>
+            <input id="email" type="email" autoComplete="email" className="input" placeholder="you@example.com" value={emailF.value} onChange={(e) => emailF.onChange(e.target.value)} onBlur={emailF.setTouched} aria-invalid={!!emailF.error} />
+            {emailF.error && <p className="field-error">{emailF.error}</p>}
           </div>
-        )}
 
-        <button type="submit" className="btn-primary w-full" disabled={submitting}>
-          {submitting ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
+          <div>
+            <label className="label" htmlFor="password">Password</label>
+            <input id="password" type="password" autoComplete="current-password" className="input" placeholder="Your password" value={password.value} onChange={(e) => password.onChange(e.target.value)} onBlur={password.setTouched} aria-invalid={!!password.error} />
+            {password.error && <p className="field-error">{password.error}</p>}
+          </div>
+
+          {formError && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-sm text-rose-700">{formError}</div>}
+          <button type="submit" className="btn-primary w-full" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</button>
+        </form>
+      </div>
     </AuthLayout>
   );
 }
