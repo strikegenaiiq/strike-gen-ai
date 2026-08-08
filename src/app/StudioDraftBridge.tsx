@@ -1,13 +1,12 @@
 import { useEffect } from "react";
 import { loadStudioDraft, saveStudioDraft, clearStudioDraft } from "./drafts";
 
-const DRAFT_EVENT = "strike-studio:draft-updated";
-
 export function StudioDraftBridge() {
   useEffect(() => {
     let textarea: HTMLTextAreaElement | null = null;
     let observer: MutationObserver | null = null;
     let pollId: number | null = null;
+    let save: (() => void) | null = null;
 
     const attach = () => {
       if (textarea) return true;
@@ -27,7 +26,7 @@ export function StudioDraftBridge() {
         textarea.dispatchEvent(new Event("input", { bubbles: true }));
       }
 
-      const save = () => {
+      save = () => {
         const prompt = textarea?.value ?? "";
         if (!prompt.trim()) {
           clearStudioDraft();
@@ -40,7 +39,6 @@ export function StudioDraftBridge() {
           resolution: "720p",
           savedAt: Date.now(),
         });
-        window.dispatchEvent(new Event(DRAFT_EVENT));
       };
 
       textarea.addEventListener("input", save);
@@ -61,8 +59,10 @@ export function StudioDraftBridge() {
     return () => {
       observer?.disconnect();
       if (pollId !== null) window.clearInterval(pollId);
-      textarea?.removeEventListener("input", () => undefined);
-      textarea?.removeEventListener("change", () => undefined);
+      if (textarea && save) {
+        textarea.removeEventListener("input", save);
+        textarea.removeEventListener("change", save);
+      }
     };
   }, []);
 
