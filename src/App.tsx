@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/app/ProtectedRoute";
 import { ProfilePage } from "@/app/ProfilePage";
 import { GeneratePage } from "@/app/GeneratePage";
 import { PricingPage } from "@/app/PricingPage";
+import { ShowcasePage } from "@/app/ShowcasePage";
 import { AdminLayout } from "@/admin/AdminLayout";
 import { AdminOverview } from "@/admin/AdminOverview";
 import { AdminUsers } from "@/admin/AdminUsers";
@@ -20,7 +21,7 @@ export function App() {
       <AdminProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Navigate to="/app/profile" replace />} />
+            <Route path="/" element={<Navigate to="/app/showcase" replace />} />
             <Route path="/signin" element={<SignInPage />} />
             <Route path="/signup" element={<SignUpPage />} />
 
@@ -29,10 +30,11 @@ export function App() {
               element={
                 <ProtectedRoute>
                   <Routes>
+                    <Route path="showcase" element={<ShowcasePage />} />
                     <Route path="generate" element={<GeneratePage />} />
                     <Route path="pricing" element={<PricingPage />} />
                     <Route path="profile" element={<ProfilePage />} />
-                    <Route path="*" element={<Navigate to="/app/generate" replace />} />
+                    <Route path="*" element={<Navigate to="/app/showcase" replace />} />
                   </Routes>
                 </ProtectedRoute>
               }
@@ -46,7 +48,7 @@ export function App() {
               <Route path="audit" element={<AdminAudit />} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/app/generate" replace />} />
+            <Route path="*" element={<Navigate to="/app/showcase" replace />} />
           </Routes>
         </BrowserRouter>
       </AdminProvider>
