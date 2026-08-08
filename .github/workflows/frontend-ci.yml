@@ -22,6 +22,7 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Keep the committed lockfile synchronized with package.json before clean install.
       - name: Repair package lock when package metadata changed
         run: |
           npm install --package-lock-only --legacy-peer-deps --no-audit --no-fund
