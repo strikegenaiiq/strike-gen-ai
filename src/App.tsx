@@ -21,7 +21,8 @@ export function App() {
       <AdminProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Navigate to="/app/showcase" replace />} />
+            <Route path="/" element={<Navigate to="/showcase" replace />} />
+            <Route path="/showcase" element={<ShowcasePage />} />
             <Route path="/signin" element={<SignInPage />} />
             <Route path="/signup" element={<SignUpPage />} />
 
@@ -48,7 +49,7 @@ export function App() {
               <Route path="audit" element={<AdminAudit />} />
             </Route>
 
-            <Route path="*" element={<Navigate to="/app/showcase" replace />} />
+            <Route path="*" element={<Navigate to="/showcase" replace />} />
           </Routes>
         </BrowserRouter>
       </AdminProvider>
