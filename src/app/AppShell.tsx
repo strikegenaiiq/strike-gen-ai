@@ -28,7 +28,7 @@ export function AppShell({
       <StudioDraftBridge />
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#08090b]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <NavLink to="/app/generate" className="flex items-center gap-3">
+          <NavLink to="/app/showcase" className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-sm font-black text-black shadow-lg shadow-white/10">
               S
             </div>
@@ -39,6 +39,14 @@ export function AppShell({
           </NavLink>
 
           <nav className="flex items-center gap-1">
+            <NavLink
+              to="/app/showcase"
+              className={({ isActive }) =>
+                `rounded-xl px-3 py-2 text-sm font-medium transition ${isActive ? "bg-white/10 text-white" : "text-white/55 hover:bg-white/5 hover:text-white"}`
+              }
+            >
+              Explore
+            </NavLink>
             <NavLink
               to="/app/generate"
               className={({ isActive }) =>
